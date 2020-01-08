@@ -32,14 +32,15 @@ namespace F_test
 		Compare();
 		Compare(int _nfeatures, float _scaleFactor, int _nlevels, int _iniThFAST, int _minThFAST);
 
-		void compare2img(const vector<Mat> img_set, const int idx1, const int idx2, const Mat mask, int typeOfFeature);
+		void compare2img(const vector<Mat> img_set, const int idx1, const int idx2, const Mat mask, int typeOfFeature, int match_type);
 
 		Frame* frame_1;
 		Frame* frame_2;
 		ORBextractor* mpORBextractor;
 
 	protected:
-		vector<DMatch> find_goodMatches(Mat desc1, Mat desc2);
+		vector<DMatch> BF_find_goodMatches(Mat desc1, Mat desc2);
+		vector<DMatch> KNN_find_goodMatches(Mat desc1, Mat desc2);
 		Mat draw_info(const Frame *F);
 		double Avg_HAMMING(const Mat desc1, const Mat desc2);
 

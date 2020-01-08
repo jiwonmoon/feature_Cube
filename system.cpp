@@ -65,10 +65,13 @@ namespace F_test
 
 	void System::TwoViewTest(const vector<Mat> img_vec, const Mat mask, const Mat cube_mask, int img_term, int delay)
 	{
+		int matcher_type = 0;
+		cout << "Seclect Matcher type(1:brute force, 2:knn search): ";
+		cin >> matcher_type;
 
 		for (int ni = 0; ni < (img_vec.size() - img_term); ni++)
 		{
-			compare_->compare2img(img_vec, ni, ni + img_term, cube_mask, typeOffeature);
+			compare_->compare2img(img_vec, ni, ni + img_term, cube_mask, typeOffeature, matcher_type);
 			waitKey(delay);
 		}
 

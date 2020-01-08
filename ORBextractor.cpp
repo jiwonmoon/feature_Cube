@@ -32,10 +32,12 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <vector>
 #include <iostream>
+#include "time.h"
 
 #include "ORBExtractor.h"
 #include "CamModelGeneral.h"
 
+#define DEBUG
 
 using namespace cv;
 using namespace std;
@@ -85,41 +87,38 @@ namespace F_test
 		const Mat& img, const Point* pattern,
 		uchar* desc)
 	{
-		float angle = (float)kpt.angle * factorPI;
+		float angle = (float)kpt.angle * factorPI;//rad
 		float a = (float)cos(angle), b = (float)sin(angle);
-
-		const uchar* center = &img.at<uchar>(cvRound(kpt.pt.y), cvRound(kpt.pt.x));
-		const int step = (int)img.step;
-
-#define GET_VALUE(idx) \
-        center[cvRound(pattern[idx].x*b + pattern[idx].y*a)*step + \
-               cvRound(pattern[idx].x*a - pattern[idx].y*b)]
-
 
 		for (int i = 0; i < 32; ++i, pattern += 16)
 		{
-			int t0, t1, val;
-			t0 = GET_VALUE(0); t1 = GET_VALUE(1);
-			val = t0 < t1;
-			t0 = GET_VALUE(2); t1 = GET_VALUE(3);
-			val |= (t0 < t1) << 1;
-			t0 = GET_VALUE(4); t1 = GET_VALUE(5);
-			val |= (t0 < t1) << 2;
-			t0 = GET_VALUE(6); t1 = GET_VALUE(7);
-			val |= (t0 < t1) << 3;
-			t0 = GET_VALUE(8); t1 = GET_VALUE(9);
-			val |= (t0 < t1) << 4;
-			t0 = GET_VALUE(10); t1 = GET_VALUE(11);
-			val |= (t0 < t1) << 5;
-			t0 = GET_VALUE(12); t1 = GET_VALUE(13);
-			val |= (t0 < t1) << 6;
-			t0 = GET_VALUE(14); t1 = GET_VALUE(15);
-			val |= (t0 < t1) << 7;
+			int idx, t0, t1, val = 0;
+
+			for (int j = 0; j < 8; j++)
+			{
+				idx = j * 2;
+				t0 = img.at<uchar>(kpt.pt.y + (pattern[idx].x * b + pattern[idx].y * a), kpt.pt.x + (pattern[idx].x * a - pattern[idx].y * b));
+				Point2f idx_1(kpt.pt.y + (pattern[idx].x * b + pattern[idx].y * a), kpt.pt.x + (pattern[idx].x * a - pattern[idx].y * b));
+
+				idx = j * 2 + 1;
+				t1 = img.at<uchar>(kpt.pt.y + (pattern[idx].x * b + pattern[idx].y * a), kpt.pt.x + (pattern[idx].x * a - pattern[idx].y * b));
+				Point2f idx_2(kpt.pt.y + (pattern[idx].x * b + pattern[idx].y * a), kpt.pt.x + (pattern[idx].x * a - pattern[idx].y * b));
+
+				if (i < 8)
+				{
+					line(img, idx_1, idx_2, Scalar(255, 0, 0), 1);
+				}
+
+				if (j == 0) {
+					val = t0 < t1;
+				}
+				else {
+					val |= (t0 < t1) << j;
+				}
+			}
 
 			desc[i] = (uchar)val;
 		}
-
-#undef GET_VALUE
 	}
 
 
@@ -837,6 +836,11 @@ namespace F_test
 
 		for (size_t i = 0; i < keypoints.size(); i++)
 			computeOrbDescriptor(keypoints[i], image, &pattern[0], descriptors.ptr((int)i));
+
+		Mat showmat;
+		resize(image, showmat, Size(1000, 1000));
+		//imshow("F", image);
+		//waitKey(0);
 	}
 
 	void ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoint>& _keypoints,
@@ -851,6 +855,12 @@ namespace F_test
 		Mat mask = _mask.getMat();
 		assert(mask.type() == CV_8UC1 && !mask.empty());
 
+
+#ifdef DEBUG
+		clock_t detect_start = clock();
+#endif
+
+
 		const int width = image.cols;
 		const int height = image.rows;
 		// Pre-compute the scale pyramid
@@ -859,7 +869,18 @@ namespace F_test
 		vector < vector<KeyPoint> > allKeypoints;
 		ComputeKeyPointsOctTree(allKeypoints);
 
+
+#ifdef DEBUG
+		double detect_time = (double)(clock() - detect_start);
+#endif
+
 		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#ifdef DEBUG
+		clock_t desc_start = clock();
+#endif
+
+
 		Mat descriptors;
 
 		int nkeypoints = 0;
@@ -876,6 +897,8 @@ namespace F_test
 		_keypoints.clear();
 		_keypoints.reserve(nkeypoints);
 
+		//cout << "befor: " << nkeypoints << endl;
+
 		int offset = 0;
 		for (int level = 0; level < nlevels; ++level)
 		{
@@ -888,6 +911,9 @@ namespace F_test
 			//save corrected point positions
 			vector<Point2f> keypoints_new;
 			keypoints_new.reserve(keypoints.size());
+
+
+
 
 			// cull points with mask and rm those in margin
 			keypoints.erase(std::remove_if(keypoints.begin(), keypoints.end(), [&](const cv::KeyPoint& keypoint)->bool {
@@ -909,6 +935,7 @@ namespace F_test
 			), keypoints.end());
 			assert(keypoints.size() == keypoints_new.size() && "ORBExtractor: keypoints should share the same size as keypooints_new");
 
+
 			// preprocess the resized image
 			Mat workingMat = mvImagePyramid[level].clone();
 			GaussianBlur(workingMat, workingMat, Size(7, 7), 2, 2, BORDER_REFLECT_101);
@@ -926,9 +953,16 @@ namespace F_test
 			// And add the keypoints to the output
 			_keypoints.insert(_keypoints.end(), keypoints.begin(), keypoints.end());
 		}
+
 		descriptors.resize(_keypoints.size());
 		descriptors.copyTo(_descriptors);
-		//_descriptors.assign(descriptors);
+
+#ifdef DEBUG
+		double desc_time = (double)(clock() - desc_start);
+
+		cout << "detect per point: " << detect_time / nkeypoints << "(" << nkeypoints << ")" << endl;
+		cout << "desc per point: " << desc_time / _keypoints.size() << "(" << _keypoints.size() << ")" << endl;
+#endif
 	}
 
 	void ORBextractor::ComputePyramid(cv::Mat image)
@@ -941,18 +975,20 @@ namespace F_test
 			Mat temp(wholeSize, image.type()), masktemp;
 			mvImagePyramid[level] = temp(Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
 
+			//cout << "size: " << sz.width << " , " << sz.height << endl;
+
 			// Compute the resized image
 			if (level != 0)
 			{
 				resize(mvImagePyramid[level - 1], mvImagePyramid[level], sz, 0, 0, INTER_LINEAR);
 
 				copyMakeBorder(mvImagePyramid[level], temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
-					BORDER_REFLECT_101 + BORDER_ISOLATED);
+					BORDER_REFLECT_101 + BORDER_ISOLATED);//mvImagePyramid[level]
 			}
 			else
 			{
 				copyMakeBorder(image, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
-					BORDER_REFLECT_101);
+					BORDER_REFLECT_101);//mvImagePyramid[level]
 			}
 		}
 

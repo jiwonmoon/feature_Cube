@@ -25,7 +25,7 @@ vector<Mat> read_lafida_imgs(int start_flag, int end_img_cnt);
 /* main */
 int main()
 {
-	int start_F_idx = 30, end_F_idx = 40;
+	int start_F_idx = 30, end_F_idx = 48;
 	//cout << "SCAN START/END FRAME Idx: ";
 	//cin >> start_F_idx;
 	//cin >> end_F_idx;
@@ -35,7 +35,7 @@ int main()
 	/* read data */
 	vector<Mat> img_set = read_lafida_imgs(start_F_idx, end_F_idx);	///if 0 <- get all the every img set
 	Mat mask = imread("../../dataset/mask/lafida_mask.png", IMREAD_GRAYSCALE);
-	Mat cube_mask = imread("../../dataset/cube_mask/gray_lafida_cubemap_mask_450.png", IMREAD_GRAYSCALE);
+	Mat cube_mask = imread("../../dataset/cube_mask/gray_lafida_cubemap_mask_650.png", IMREAD_GRAYSCALE);
 	if (cube_mask.empty() || mask.empty())
 	{
 		std::cout << "fail to read the mask: " << std::endl;
@@ -46,7 +46,7 @@ int main()
 	
 
 	//0: ORB, 1:BRISK, 2:AKAZE 3:ORB_EX
-	F_test::System F_system(F_test::System::OMNI, F_test::System::ORB_EX, settingFilePath, img_set.size(), 100);
+	F_test::System F_system(F_test::System::OMNI, F_test::System::ORB_EX, settingFilePath, img_set.size(), 1000);
 
 
 	//Make cube img_set
@@ -67,8 +67,11 @@ int main()
 		//circle(cubemapImg, Point(450, 450), 4, Scalar(0, 0, 255), -1);
 
 		cube_img_set.push_back(cubemapImg);
-		//imshow("cube", cube_img_set[ni]);
-		//waitKey(0);
+
+		//resize(cube_img_set[ni], cube_img_set[ni], Size(cube_img_set[ni].cols / 2, cube_img_set[ni].rows / 2), 0, 0, CV_INTER_LINEAR);
+		//imshow("P", img_set[ni]);
+		//imshow("F", cube_img_set[ni]);
+		waitKey(0);
 	}
 
 
@@ -112,7 +115,7 @@ int main()
 
 
 
-	F_system.TwoViewTest(cube_img_set, mask, cube_mask, 2, 33);//(img term), (20)
+	F_system.TwoViewTest(cube_img_set, mask, cube_mask, 5, 33);//(img term), (20)
 	F_system.print_RESULT();
 
 

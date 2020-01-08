@@ -24,7 +24,7 @@ vector<Mat> read_cube_imgs(int start_flag, int end_img_cnt);
 /* main */
 int main()
 {
-	int start_F_idx = 30, end_F_idx = 50;
+	int start_F_idx = 400, end_F_idx = 411;
 	//cout << "SCAN START/END FRAME Idx: ";
 	//cin >> start_F_idx;
 	//cin >> end_F_idx;
@@ -43,7 +43,7 @@ int main()
 	std::string settingFilePath("../../Config/front_cam_params.yaml");
 
 	//0: ORB, 1:BRISK, 2:AKAZE 3:ORB_EX
-	F_test::System F_system(F_test::System::OMNI, F_test::System::ORB_EX, settingFilePath, img_set.size(), 50);
+	F_test::System F_system(F_test::System::OMNI, F_test::System::ORB_EX, settingFilePath, img_set.size(), 3000);
 
 
 	//Make cube img_set

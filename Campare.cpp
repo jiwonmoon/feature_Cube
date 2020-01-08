@@ -1,7 +1,7 @@
 #include "Compare.h"
 #include "time.h"
 
-#define DEBUG
+#define DEBUGs
 
 namespace F_test
 {
@@ -20,7 +20,7 @@ namespace F_test
 
 	}
 
-	void Compare::compare2img(const vector<Mat> img_set, const int idx1, const int idx2, const Mat mask, int typeOfFeature) {
+	void Compare::compare2img(const vector<Mat> img_set, const int idx1, const int idx2, const Mat mask, int typeOfFeature, int match_type) {
 		cout << "[TwoViewTest >> compare2img (" << idx1 << " vs " << idx2 << ")]" << endl << endl;
 
 
@@ -41,12 +41,42 @@ namespace F_test
 		}
 
 		int num_avg_Keypoint = (frame_1->N + frame_2->N) / 2;
+		//draw left DC
+		Mat L_img = draw_info(frame_1);
+		Mat R_img = draw_info(frame_2);
 
-		/// Find good Matches
+		//imshow("L_img", L_img);	cv::moveWindow("L_img", 10, 50);
+		//imshow("R_img", R_img);	cv::moveWindow("R_img", 10 + L_img.cols, 50);
+		//waitKey(0);
+
+
 		clock_t start_goodMatch = clock();
 		vector<DMatch> goodMatches;
-		goodMatches = find_goodMatches(frame_1->mDescriptors, frame_2->mDescriptors);
+		switch (match_type)
+		{
+		case 1://brute force
+			goodMatches = BF_find_goodMatches(frame_1->mDescriptors, frame_2->mDescriptors);
+			break;
+
+		case 2://knn search
+			/// Find good Matches
+			goodMatches = KNN_find_goodMatches(frame_1->mDescriptors, frame_2->mDescriptors);
+			break;
+		}
 		double duration_goodMatch = (double)(clock() - start_goodMatch);
+
+
+		int Avg_dist = 0, sum_dist = 0, n_dist = 0;
+		for (int i = 0; i < goodMatches.size(); i++)
+		{
+			sum_dist += goodMatches[i].distance;
+			n_dist++;
+		}
+		Avg_dist = sum_dist / n_dist;
+
+		cout << "goodMatches size:: " << goodMatches.size() << endl;
+		cout << "goodMatches Avg_dist:: " << Avg_dist << endl;
+
 
 		float recog_Rate = (float)goodMatches.size() / (float)num_avg_Keypoint * 100;
 		if (goodMatches.size() < 1)
@@ -68,19 +98,6 @@ namespace F_test
 #endif
 
 
-		//draw left DC
-		Mat L_img = draw_info(frame_1);
-		Mat R_img = draw_info(frame_2);
-
-		imshow("L_img", L_img);	cv::moveWindow("L_img", 10, 50);
-		imshow("R_img", R_img);	cv::moveWindow("R_img", 10+ L_img.cols, 50);
-		waitKey(0);
-
-
-		////calculate HAMMING DIST AVG
-		//double distance = Avg_HAMMING(frame_1->mDescriptors, frame_2->mDescriptors);
-		//cout << "Descriptor distance:: " << distance << endl;
-
 		///draw good_matches
 		Mat imgMatches;
 		drawMatches(frame_1->F_img, frame_1->mvKeys, frame_2->F_img, frame_2->mvKeys, goodMatches, imgMatches,
@@ -94,7 +111,40 @@ namespace F_test
 
 
 
-	vector<DMatch> Compare::find_goodMatches(Mat desc1, Mat desc2)
+	vector<DMatch> Compare::BF_find_goodMatches(Mat desc1, Mat desc2)
+	{
+		vector<DMatch> matches;
+		BFMatcher matcher(NORM_HAMMING);
+
+		matcher.match(frame_1->mDescriptors, frame_2->mDescriptors, matches);
+		cout << "matches.size(): " << matches.size() << endl;
+		if (matches.size() < 4)
+			exit(0);
+
+		double minDist, maxDist;
+		minDist = maxDist = matches[0].distance;
+		for (int i = 1; i < matches.size(); i++)
+		{
+			double dist = matches[i].distance;
+			if (dist < minDist) minDist = dist;
+			if (dist > maxDist) maxDist = dist;
+		}
+		cout << "minDIst = " << minDist << endl;
+		cout << "maxDist = " << maxDist << endl;
+
+		vector<DMatch> goodMatches;
+		double fTh = 4 * minDist;
+		for (int i = 0; i < matches.size(); i++)
+		{
+			if (matches[i].distance <= max(fTh, 0.02))
+				goodMatches.push_back(matches[i]);
+		}
+
+		return goodMatches;
+	}
+
+
+	vector<DMatch> Compare::KNN_find_goodMatches(Mat desc1, Mat desc2)
 	{
 		int k = 2;
 		Mat indices;
@@ -118,7 +168,6 @@ namespace F_test
 		}
 		return goodMatches;
 	}
-
 	Mat Compare::draw_info(const Frame *F)
 	{
 		Mat Lable_img(F->F_img.size(), CV_8U);
